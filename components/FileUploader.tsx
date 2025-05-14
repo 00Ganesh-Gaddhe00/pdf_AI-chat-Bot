@@ -6,11 +6,23 @@ import { CheckCircleIcon, CircleArrowDown, HammerIcon, RocketIcon, SaveIcon } fr
 
 function FileUploader() {
     const onDrop = useCallback((acceptedFiles:File[]) => {
-        console.log(acceptedFiles)
-        // Do something with the files
+       
+      const file = acceptedFiles[0]
+
+      if(file){
+        
+      }
+        
       }, [])
 
-      const {getRootProps, getInputProps, isDragActive, isFocused, isDragAccept} = useDropzone({onDrop})
+      const {getRootProps, getInputProps, isDragActive, isFocused, isDragAccept} = 
+      useDropzone({
+        onDrop,
+        maxFiles:1,
+        accept : {
+          "application/pdf":[".pdf"] 
+        }
+      })
 
 
   return (

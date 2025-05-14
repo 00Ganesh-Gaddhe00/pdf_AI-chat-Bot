@@ -6,7 +6,7 @@ import { FilePlus2 } from "lucide-react";
 
 function Header() {
   return (
-    <div className="flex justify-between bg-white shadow-sm p-5 border-b">
+    <div className="flex justify-between bg-white shadow-sm p-5 border-b-gray-500">
       <Link href="/dashboard" className="text-2xl">
         chat to <span className=" text-indigo-600">PDF</span>
       </Link>

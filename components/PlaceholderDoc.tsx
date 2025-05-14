@@ -16,7 +16,7 @@ function PlaceholderDoc() {
   return (
     <Button 
     onClick={HandleClick}
-    className='flex flex-col items-center justify-center w-64 h-80 rounded-xl bg-gray-200 drop-shadow-md text-gray-400 hover:cursor-pointer '>
+    className='flex flex-col items-center justify-center w-64 h-80 rounded-xl bg-gray-200 drop-shadow-md text-gray-400 hover:cursor-pointer hover:bg-gray-300 '>
         <div className='text-7xl'>&#8853;</div>
         <p>Add a Document</p>
     </Button>
