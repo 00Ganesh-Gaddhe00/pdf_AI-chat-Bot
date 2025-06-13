@@ -37,12 +37,12 @@ function useUpload() {
             const percent = Math.round(
                 (snapshot.bytesTransferred/snapshot.totalBytes) *100
             );
-            setStatus(statusText.UPLOADED);
+            setStatus(statusText.UPLOADING);
             setProgress(percent)
          }, (error)=>{
             console.log("Error Uploading file", error)
-         },async()=>{
-             setStatus(statusText.UPLOADED)
+         }, async()=>{
+              setStatus(statusText.UPLOADED)
              
              const downloadURL = await getDownloadURL(uploadtask.snapshot.ref)
              setStatus(statusText.SAVING)
@@ -59,14 +59,13 @@ function useUpload() {
              setStatus(statusText.GENERATING);
              // generating embedding
 
-             setFileId(fileTouploadID)
-         }
+             setFileId(fileTouploadID);
+          }
         
-        ),
+     )
+     }
 
-
-    }
-
+     return {progress, status, fileId, handleUpload}
   
 }
 
