@@ -6,6 +6,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react'
 import {v4 as uuidv4} from "uuid"
+import { generateEmbeddings } from '@/actions/generateEmbeddings';
 
 export enum statusText {
        UPLOADING = "Uploading file...",
@@ -58,6 +59,7 @@ function useUpload() {
 
              setStatus(statusText.GENERATING);
              // generating embedding
+             await generateEmbeddings(fileTouploadID);
 
              setFileId(fileTouploadID);
           }
