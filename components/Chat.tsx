@@ -10,8 +10,8 @@ import { useCollection } from "react-firebase-hooks/firestore";
 import { useUser } from "@clerk/nextjs";
 import { collection, orderBy, query } from "firebase/firestore";
 import { db } from "@/firebase";
-import { console } from "inspector";
-// import { askQuestion } from "@/actions/askQuestion";
+// import { console } from "inspector";
+import { askQuestion } from "@/actions/askQuestion";
 // import ChatMessage from "./ChatMessage";
 // import { useToast } from "./ui/use-toast";
 
@@ -29,37 +29,103 @@ function Chat({ id }: { id: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isPending, startTransition] = useTransition();
 
-    const handleSumbit = async (e:FormEvent)=>{
-        e.preventDefault()
-       
-        const q= input
-        
-        setInput("");
+    const [snapshot, loading, error] = useCollection(
+        user &&
+          query(
+            collection(db, "users", user?.id, "files", id, "chat"),
+            orderBy("createdAt", "asc")
+          )
+      );
+
+      useEffect(() => {
+        if (!snapshot) return;
+    
+        console.log("Updated snapshot", snapshot.docs);
+    
+        // get second last message to check if the AI is thinking
+        const lastMessage = messages.pop();
+    
+        if (lastMessage?.role === "ai" && lastMessage.message === "Thinking...") {
+          // return as this is a dummy placeholder message
+          return;
+        }
+    
+        const newMessages = snapshot.docs.map((doc) => {
+          const { role, message, createdAt } = doc.data();
+    
+          return {
+            id: doc.id,
+            role,
+            message,
+            createdAt: createdAt.toDate(),
+          };
+        });
+    
+        setMessages(newMessages);
+    
+        // Ignore messages dependancy warning here... we dont want an infinite loop
+      }, [snapshot]);
+
+  
+      const handleSumbit = async (e:FormEvent)=>{
+        e.preventDefault();
+
+    const q = input;
+
+    setInput("");
 
     // Optimistic UI update
     setMessages((prev) => [
-        ...prev,
-        {
-          role: "human",
-          message: q,
-          createdAt: new Date(),
-        },
-        {
-          role: "ai",
-          message: "Thinking...",
-          createdAt: new Date(),
-        },
-      ]);
-      
-       
+      ...prev,
+      {
+        role: "human",
+        message: q,
+        createdAt: new Date(),
+      },
+      {
+        role: "ai",
+        message: "Thinking...",
+        createdAt: new Date(),
+      },
+    ]);
 
-    }
+    startTransition(async () => {
+      const { success, message } = await askQuestion(id, q);
+
+      console.log("DEBUG", success, message);
+
+      if (!success) {
+        // toast({
+        //   variant: "destructive",
+        //   title: "Error",
+        //   description: message,
+        // });
+
+        setMessages((prev) =>
+          prev.slice(0, prev.length - 1).concat([
+            {
+              role: "ai",
+              message: `Whoops... ${message}`,
+              createdAt: new Date(),
+            },
+          ])
+        );
+      }
+    });
+
+      }
 
   return (
     <div className="flex flex-col h-full overflow-scroll">
         {/* chat contenet */}
         <div className="flex-1 w-full">
             {/* chat messages */}
+            {
+                messages.map((msg)=>{
+
+               return <div key={(msg.id)}><p>{msg.message}</p></div>
+            })
+            }
         </div>
 
   <form
