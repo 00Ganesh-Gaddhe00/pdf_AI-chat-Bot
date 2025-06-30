@@ -12,7 +12,7 @@ interface HuggingFaceEmbeddingsInstance {
 export function HuggingFaceEmbeddings(
   this: HuggingFaceEmbeddingsInstance,
   apiKey: string,
-  model: HFModelType = "BAAI/bge-large-en-v1.5"
+  model: HFModelType = "BAAI/bge-large-en-v1.5 "
 ) {
   if (!(this instanceof HuggingFaceEmbeddings)) {
     return new (HuggingFaceEmbeddings as any)(apiKey, model);

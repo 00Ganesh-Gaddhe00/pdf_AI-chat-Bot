@@ -189,9 +189,21 @@ const model = new HuggingFaceInference({
     // ]);
 
     const historyAwarePrompt = ChatPromptTemplate.fromMessages([
-        ["system", "You are a helpful assistant. Given the following conversation history and question, return a concise search query to look up relevant documents."],
-        ["user", "{input}"]
+        [
+          "system",
+          `You are a search query generator.
+      
+      Given the following conversation history and the user's latest question, generate **one short and specific search query** that would help retrieve documents to answer the user's question.
+      
+      Only include keywords from the latest user message and relevant prior context.
+      
+      Avoid repeating or summarizing multiple questions.
+      
+      Format: Just the query, no explanations.`,
+        ],
+        ["user", "Conversation history:\n\n{chat_history}\n\nLatest question:\n\n{input}"],
       ]);
+      
   
     // Create a history-aware retriever chain that uses the model, retriever, and prompt
     console.log("--- Creating a history-aware retriever chain... ---");
@@ -203,19 +215,20 @@ const model = new HuggingFaceInference({
   
     // Define a prompt template for answering questions based on retrieved context
     console.log("--- Defining a prompt template for answering questions... ---");
+
     const historyAwareRetrievalPrompt = ChatPromptTemplate.fromMessages([
-        [
-          "system",
-          `You are a helpful assistant. Answer the user's question based ONLY on the context below.
-      Give a clear, concise answer — no extra details or explanations.
-      If the answer is not in the context, say: "I don't have that information."
-      
-      Context:
-      {context}`,
-        ],
-        ...chatHistory,
-        ["user", "{input}"],
-      ]);
+  [
+    "system",
+    `You are a helpful assistant. Answer the user's question based ONLY on the context below.
+Give a clear, concise answer — no extra details or explanations.
+If the answer is not in the context, say: "I don't have that information."
+
+Context:
+{context}`,
+  ],
+  ["user", "{input}"],
+]);
+
       
     // Create a chain to combine the retrieved documents into a coherent response
     console.log("--- Creating a document combining chain... ---");
