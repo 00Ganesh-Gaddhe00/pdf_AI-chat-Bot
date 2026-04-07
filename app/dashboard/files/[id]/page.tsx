@@ -7,9 +7,7 @@ import React from "react";
 async function chatTofilePage({
   params
 }: {
-  params: {
-    id: string;
-  };
+  params: Promise<{ id: string }>;
 }) {
 
   auth.protect()

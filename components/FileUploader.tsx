@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, JSX } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { CheckCircleIcon, CircleArrowDown, HammerIcon, RocketIcon, SaveIcon } from 'lucide-react'
 import useUpload, { statusText } from '@/hooks/useUpload'
