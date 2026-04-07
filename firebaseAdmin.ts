@@ -6,9 +6,7 @@ let app: App;
 if(getApps().length === 0){
     app = initializeApp({
         credential: cert(
-            process.env.FIREBASE_SERVICE_KEY
-                ? JSON.parse(process.env.FIREBASE_SERVICE_KEY)
-                : require('./service_key.json')
+            JSON.parse(process.env.FIREBASE_SERVICE_KEY!)
         ),
     })
 } else {
