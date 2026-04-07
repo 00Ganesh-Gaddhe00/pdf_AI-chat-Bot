@@ -12,7 +12,7 @@ interface HuggingFaceEmbeddingsInstance {
 export function HuggingFaceEmbeddings(
   this: HuggingFaceEmbeddingsInstance,
   apiKey: string,
-  model: HFModelType = "BAAI/bge-large-en-v1.5 "
+  model: HFModelType = "BAAI/bge-large-en-v1.5"
 ) {
   if (!(this instanceof HuggingFaceEmbeddings)) {
     return new (HuggingFaceEmbeddings as any)(apiKey, model);
@@ -24,33 +24,33 @@ export function HuggingFaceEmbeddings(
 
 // Fetch embedding for single or multiple texts
 HuggingFaceEmbeddings.prototype._fetchEmbedding = async function (
-    this: HuggingFaceEmbeddingsInstance,
-    textOrTexts: string | string[]
-  ): Promise<number[][]> {
-    const res = await fetch(
-      `https://api-inference.huggingface.co/models/${this.model}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: textOrTexts }),
-      }
-    );
-  
-    if (!res.ok) {
-      throw new Error(`Hugging Face API error: ${res.status} ${res.statusText}`);
+  this: HuggingFaceEmbeddingsInstance,
+  textOrTexts: string | string[]
+): Promise<number[][]> {
+  const res = await fetch(
+    `https://router.huggingface.co/hf-inference/models/${this.model}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ inputs: textOrTexts }),
     }
-  
-    const data = await res.json();
-  
-    if (Array.isArray(textOrTexts)) {
-      return data; // multiple embeddings
-    } else {
-      return [data]; // wrap single embedding
-    }
-  };
+  );
+
+  if (!res.ok) {
+    throw new Error(`Hugging Face API error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+
+  if (Array.isArray(textOrTexts)) {
+    return data; // multiple embeddings
+  } else {
+    return [data]; // wrap single embedding
+  }
+};
 // // Helper: average embeddings across tokens to single vector
 // function averageEmbeddings(embeddings: number[][]): number[] {
 //   if (embeddings.length === 0) return [];

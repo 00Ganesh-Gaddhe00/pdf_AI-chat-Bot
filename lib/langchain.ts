@@ -14,184 +14,183 @@ import { Index, RecordMetadata } from "@pinecone-database/pinecone";
 import { admindb } from "../firebaseAdmin";
 import { auth } from "@clerk/nextjs/server";
 import { HuggingFaceEmbeddings } from "./createHFembding";
-import { HuggingFaceInference } from "@langchain/community/llms/hf"
+import { ChatGroq } from "@langchain/groq";
 
-// Initialize the OpenAI model with API key and model name
-const model = new HuggingFaceInference({
-    model: "HuggingFaceH4/zephyr-7b-beta", // or another text-gen model
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-    temperature: 0.7,
-  });
+const model = new ChatGroq({
+  apiKey: process.env.GROQ_API_KEY!,
+  model: "llama-3.1-8b-instant",
+});
 
 
-  export const indexName = "pdfchat";
+export const indexName = "pdfchat";
 
-  async function fetchMessagesFromDB(docId: string) {
-    const { userId } = await auth();
-    if (!userId) {
-      throw new Error("User not found");
-    }
-  
-    console.log("--- Fetching chat history from the firestore database... ---");
-    // Get the last 6 messages from the chat history
-    const chats = await admindb
-      .collection(`users`)
-      .doc(userId)
-      .collection("files")
-      .doc(docId)
-      .collection("chat")
-      .orderBy("createdAt", "desc")
-      // .limit(LIMIT)
-      .get();
-  
-    const chatHistory = chats.docs.map((doc) =>
-      doc.data().role === "human"
-        ? new HumanMessage(doc.data().message)
-        : new AIMessage(doc.data().message)
-    );
-  
+async function fetchMessagesFromDB(docId: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("User not found");
+  }
+
+  console.log("--- Fetching chat history from the firestore database... ---");
+  // Get the last 6 messages from the chat history
+  const chats = await admindb
+    .collection(`users`)
+    .doc(userId)
+    .collection("files")
+    .doc(docId)
+    .collection("chat")
+    .orderBy("createdAt", "desc")
+    // .limit(LIMIT)
+    .get();
+
+  const chatHistory = chats.docs.map((doc) =>
+    doc.data().role === "human"
+      ? new HumanMessage(doc.data().message)
+      : new AIMessage(doc.data().message)
+  );
+
+  console.log(
+    `--- fetched last ${chatHistory.length} messages successfully ---`
+  );
+  console.log(chatHistory.map((msg) => msg.content.toString()));
+
+  return chatHistory;
+}
+
+
+export async function generateDocs(docId: string) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error("User not found");
+  }
+
+  console.log("--- Fetching the download URL from Firebase... ---");
+  const firebaseRef = await admindb
+    .collection("users")
+    .doc(userId)
+    .collection("files")
+    .doc(docId)
+    .get();
+
+  const downloadUrl = firebaseRef.data()?.downloadURL;
+
+  if (!downloadUrl) {
+    throw new Error("Download URL not found");
+  }
+
+  console.log(`--- Download URL fetched successfully: ${downloadUrl} ---`);
+
+  // Fetch the PDF from the specified URL
+  const response = await fetch(downloadUrl);
+
+  // Load the PDF into a PDFDocument object
+  const data = await response.blob();
+
+  // Load the PDF document from the specified path
+  console.log("--- Loading PDF document... ---");
+  const loader = new PDFLoader(data);
+  const docs = await loader.load();
+
+  // Split the loaded document into smaller parts for easier processing
+  console.log("--- Splitting the document into smaller parts... ---");
+  const splitter = new RecursiveCharacterTextSplitter();
+
+  const splitDocs = await splitter.splitDocuments(docs);
+  console.log(`--- Split into ${splitDocs.length} parts ---`);
+
+  return splitDocs;
+}
+
+async function namespaceExists(
+  index: Index<RecordMetadata>,
+  namespace: string
+) {
+  if (namespace === null) throw new Error("No namespace value provided.");
+  const { namespaces } = await index.describeIndexStats();
+  const ns = namespaces?.[namespace];
+  return ns !== undefined && (ns.recordCount ?? 0) > 0;
+}
+
+export async function generateEmbeddingsInPineconeVectorStore(docId: string) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error("User not found");
+  }
+
+  let pineconeVectorStore;
+
+  // Generate embeddings (numerical representations) for the split documents
+  console.log("--- Generating embeddings... ---");
+  const hfApiKey = process.env.HUGGINGFACE_API_KEY;
+  const embeddings = new (HuggingFaceEmbeddings as any)(hfApiKey);
+
+  const index = await pineconeClient.index(indexName);
+  const namespaceAlreadyExists = await namespaceExists(index, docId);
+
+  if (namespaceAlreadyExists) {
     console.log(
-      `--- fetched last ${chatHistory.length} messages successfully ---`
+      `--- Namespace ${docId} already exists, reusing existing embeddings... ---`
     );
-    console.log(chatHistory.map((msg) => msg.content.toString()));
-  
-    return chatHistory;
-  }
 
+    pineconeVectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+      pineconeIndex: index,
+      namespace: docId,
+    });
 
-  export async function generateDocs(docId: string) {
-    const { userId } = await auth();
-  
-    if (!userId) {
-      throw new Error("User not found");
-    }
-  
-    console.log("--- Fetching the download URL from Firebase... ---");
-    const firebaseRef = await admindb
-      .collection("users")
-      .doc(userId)
-      .collection("files")
-      .doc(docId)
-      .get();
-  
-    const downloadUrl = firebaseRef.data()?.downloadURL;
-  
-    if (!downloadUrl) {
-      throw new Error("Download URL not found");
-    }
-  
-    console.log(`--- Download URL fetched successfully: ${downloadUrl} ---`);
-  
-    // Fetch the PDF from the specified URL
-    const response = await fetch(downloadUrl);
-  
-    // Load the PDF into a PDFDocument object
-    const data = await response.blob();
-  
-    // Load the PDF document from the specified path
-    console.log("--- Loading PDF document... ---");
-    const loader = new PDFLoader(data);
-    const docs = await loader.load();
-  
-    // Split the loaded document into smaller parts for easier processing
-    console.log("--- Splitting the document into smaller parts... ---");
-    const splitter = new RecursiveCharacterTextSplitter();
-  
-    const splitDocs = await splitter.splitDocuments(docs);
-    console.log(`--- Split into ${splitDocs.length} parts ---`);
-  
-    return splitDocs;
-  }
+    return pineconeVectorStore;
+  } else {
+    // If the namespace does not exist, download the PDF from firestore via the stored Download URL & generate the embeddings and store them in the Pinecone vector store
+    const splitDocs = await generateDocs(docId);
 
-  async function namespaceExists(
-    index: Index<RecordMetadata>,
-    namespace: string
-  ) {
-    if (namespace === null) throw new Error("No namespace value provided.");
-    const { namespaces } = await index.describeIndexStats();
-    return namespaces?.[namespace] !== undefined;
-  }
+    console.log(
+      `--- Storing the embeddings in namespace ${docId} in the ${indexName} Pinecone vector store... ---`
+    );
 
-  export async function generateEmbeddingsInPineconeVectorStore(docId: string) {
-    const { userId } = await auth();
-  
-    if (!userId) {
-      throw new Error("User not found");
-    }
-  
-    let pineconeVectorStore;
-  
-    // Generate embeddings (numerical representations) for the split documents
-    console.log("--- Generating embeddings... ---");
-    const hfApiKey = process.env.HUGGINGFACE_API_KEY;
-    const embeddings = new (HuggingFaceEmbeddings as any)(hfApiKey);
-    
-    const index = await pineconeClient.index(indexName);
-    const namespaceAlreadyExists = await namespaceExists(index, docId);
-  
-    if (namespaceAlreadyExists) {
-      console.log(
-        `--- Namespace ${docId} already exists, reusing existing embeddings... ---`
-      );
-  
-      pineconeVectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+    pineconeVectorStore = await PineconeStore.fromDocuments(
+      splitDocs,
+      embeddings,
+      {
         pineconeIndex: index,
         namespace: docId,
-      });
-  
-      return pineconeVectorStore;
-    } else {
-      // If the namespace does not exist, download the PDF from firestore via the stored Download URL & generate the embeddings and store them in the Pinecone vector store
-      const splitDocs = await generateDocs(docId);
-  
-      console.log(
-        `--- Storing the embeddings in namespace ${docId} in the ${indexName} Pinecone vector store... ---`
-      );
-  
-      pineconeVectorStore = await PineconeStore.fromDocuments(
-        splitDocs,
-        embeddings,
-        {
-          pineconeIndex: index,
-          namespace: docId,
-        }
-      );
-  
-      return pineconeVectorStore;
-    }
+      }
+    );
+
+    return pineconeVectorStore;
+  }
+}
+
+const generateLangchainCompletion = async (docId: string, question: string) => {
+  let pineconeVectorStore;
+
+  pineconeVectorStore = await generateEmbeddingsInPineconeVectorStore(docId);
+  if (!pineconeVectorStore) {
+    throw new Error("Pinecone vector store not found");
   }
 
-  const generateLangchainCompletion = async (docId: string, question: string) => {
-    let pineconeVectorStore;
-  
-    pineconeVectorStore = await generateEmbeddingsInPineconeVectorStore(docId);
-    if (!pineconeVectorStore) {
-      throw new Error("Pinecone vector store not found");
-    }
-  
-    // Create a retriever to search through the vector store
-    console.log("--- Creating a retriever... ---");
-    const retriever = pineconeVectorStore.asRetriever();
-  
-    // Fetch the chat history from the database
-    const chatHistory = await fetchMessagesFromDB(docId);
-  
-    // Define a prompt template for generating search queries based on conversation history
-    console.log("--- Defining a prompt template... ---");
-    // const historyAwarePrompt = ChatPromptTemplate.fromMessages([
-    //   ...chatHistory, // Insert the actual chat history here
-  
-    //   ["user", "{input}"],
-    //   [
-    //     "user",
-    //     "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation",
-    //   ],
-    // ]);
+  // Create a retriever to search through the vector store
+  console.log("--- Creating a retriever... ---");
+  const retriever = pineconeVectorStore.asRetriever();
 
-    const historyAwarePrompt = ChatPromptTemplate.fromMessages([
-        [
-          "system",
-          `You are a search query generator.
+  // Fetch the chat history from the database
+  const chatHistory = await fetchMessagesFromDB(docId);
+
+  // Define a prompt template for generating search queries based on conversation history
+  console.log("--- Defining a prompt template... ---");
+  // const historyAwarePrompt = ChatPromptTemplate.fromMessages([
+  //   ...chatHistory, // Insert the actual chat history here
+
+  //   ["user", "{input}"],
+  //   [
+  //     "user",
+  //     "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation",
+  //   ],
+  // ]);
+
+  const historyAwarePrompt = ChatPromptTemplate.fromMessages([
+    [
+      "system",
+      `You are a search query generator.
       
       Given the following conversation history and the user's latest question, generate **one short and specific search query** that would help retrieve documents to answer the user's question.
       
@@ -200,60 +199,63 @@ const model = new HuggingFaceInference({
       Avoid repeating or summarizing multiple questions.
       
       Format: Just the query, no explanations.`,
-        ],
-        ["user", "Conversation history:\n\n{chat_history}\n\nLatest question:\n\n{input}"],
-      ]);
-      
-  
-    // Create a history-aware retriever chain that uses the model, retriever, and prompt
-    console.log("--- Creating a history-aware retriever chain... ---");
-    const historyAwareRetrieverChain = await createHistoryAwareRetriever({
-      llm: model,
-      retriever,
-      rephrasePrompt: historyAwarePrompt,
-    });
-  
-    // Define a prompt template for answering questions based on retrieved context
-    console.log("--- Defining a prompt template for answering questions... ---");
+    ],
+    ["user", "Conversation history:\n\n{chat_history}\n\nLatest question:\n\n{input}"],
+  ]);
 
-    const historyAwareRetrievalPrompt = ChatPromptTemplate.fromMessages([
-  [
-    "system",
-    `You are a helpful assistant. Answer the user's question based ONLY on the context below.
-Give a clear, concise answer — no extra details or explanations.
-If the answer is not in the context, say: "I don't have that information."
 
-Context:
-{context}`,
-  ],
-  ["user", "{input}"],
-]);
+  // Create a history-aware retriever chain that uses the model, retriever, and prompt
+  console.log("--- Creating a history-aware retriever chain... ---");
+  const historyAwareRetrieverChain = await createHistoryAwareRetriever({
+    llm: model,
+    retriever,
+    rephrasePrompt: historyAwarePrompt,
+  });
 
-      
-    // Create a chain to combine the retrieved documents into a coherent response
-    console.log("--- Creating a document combining chain... ---");
-    const historyAwareCombineDocsChain = await createStuffDocumentsChain({
-      llm: model,
-      prompt: historyAwareRetrievalPrompt,
-    });
-  
-    // Create the main retrieval chain that combines the history-aware retriever and document combining chains
-    console.log("--- Creating the main retrieval chain... ---");
-    const conversationalRetrievalChain = await createRetrievalChain({
-      retriever: historyAwareRetrieverChain,
-      combineDocsChain: historyAwareCombineDocsChain,
-    });
-  
-    console.log("--- Running the chain with a sample conversation... ---");
-    const reply = await conversationalRetrievalChain.invoke({
-      chat_history: chatHistory,
-      input: question,
-    });
-  
-    // Print the result to the console
-    console.log(reply.answer);
-    return reply.answer;
-  };
-  
+  // Define a prompt template for answering questions based on retrieved context
+  console.log("--- Defining a prompt template for answering questions... ---");
+
+  const historyAwareRetrievalPrompt = ChatPromptTemplate.fromMessages([
+    [
+      "system",
+      `You are a helpful assistant answering questions about a PDF document.
+
+Here is the relevant content from the document:
+<context>
+{context}
+</context>
+
+Use the content above to answer the user's question. Be concise and helpful. If the content does not contain enough information to answer, say "I don't have enough information in this document to answer that."`,
+    ],
+    ["user", "{input}"],
+  ]);
+
+
+  // Create a chain to combine the retrieved documents into a coherent response
+  console.log("--- Creating a document combining chain... ---");
+  const historyAwareCombineDocsChain = await createStuffDocumentsChain({
+    llm: model,
+    prompt: historyAwareRetrievalPrompt,
+  });
+
+  // Create the main retrieval chain that combines the history-aware retriever and document combining chains
+  console.log("--- Creating the main retrieval chain... ---");
+  const conversationalRetrievalChain = await createRetrievalChain({
+    retriever: historyAwareRetrieverChain,
+    combineDocsChain: historyAwareCombineDocsChain,
+  });
+
+  console.log("--- Running the chain with a sample conversation... ---");
+  const reply = await conversationalRetrievalChain.invoke({
+    chat_history: chatHistory,
+    input: question,
+  });
+
+  console.log("--- Retrieved context docs:", reply.context?.length ?? 0, "---");
+  console.log("--- Context preview:", reply.context?.[0]?.pageContent?.slice(0, 200) ?? "NONE");
+  console.log(reply.answer);
+  return reply.answer;
+};
+
 // Export the model and the run function
 export { model, generateLangchainCompletion };
