@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PDF Chat
 
-## Getting Started
+An AI-powered PDF chat application built with Next.js that lets you upload PDF documents and have intelligent conversations about their content.
 
-First, run the development server:
+![Homepage](public/Homepage.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Upload and manage PDF documents
+- AI-powered Q&A — ask any question about your documents
+- Real-time chat with streaming responses
+- Secure authentication via Clerk
+- Document storage with Firebase
+- Vector search powered by Pinecone for accurate answers
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Chat
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+![Chat](public/Chat.png)
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+PDF Chat leverages a full **Retrieval-Augmented Generation (RAG)** pipeline to deliver accurate, context-aware answers from your documents. When a PDF is uploaded, it is parsed and split into chunks, which are then converted into vector embeddings using OpenAI and stored in a Pinecone vector database. At query time, LangChain orchestrates the retrieval — semantically searching the vector store for the most relevant chunks and injecting them as context into the prompt. The LLM (powered by Groq or OpenAI) then reasons over that retrieved context to generate a grounded, document-specific response — rather than relying on general knowledge alone. This agentic retrieval loop ensures answers stay accurate and traceable to the source material.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework:** Next.js 15 (App Router)
+- **Auth:** Clerk
+- **Database & Storage:** Firebase / Firestore
+- **Vector DB:** Pinecone
+- **AI / LLM:** LangChain + Groq + OpenAI
+- **UI:** Tailwind CSS, Radix UI, shadcn/ui
+- **PDF Rendering:** react-pdf
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT — feel free to use and modify for your own projects.
